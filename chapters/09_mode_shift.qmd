@@ -1,0 +1,39 @@
+# Overall comments
+
+```{r}
+library(ggplot2)
+source("../support_files/core_functions.R")
+source("../support_files/theme.R")
+```
+
+
+```{r}
+bus_starter <- bus_read_data()
+bus_pre_post <- before_after(bus_starter)
+cycle_starter <- cycle_read_data()
+cycle_pre_post <- before_after(cycle_starter)
+pedestrian_starter <- pedestrian_read_data()
+pedestrian_pre_post <- before_after(pedestrian_starter)
+light_starter <- NZTA_read_data("Light")
+light_pre_post <- before_after(light_starter)
+heavy_starter <- NZTA_read_data("Heavy")
+heavy_pre_post <- before_after(heavy_starter)
+```
+
+```{r}
+#| fig-cap: "All modes of transport. Change in daily average counts in March-May 2026 compared to expectations based on 2025"
+#| fig-height: 3
+gfdf <- bind_rows(bus_pre_post, cycle_pre_post, heavy_pre_post,
+          light_pre_post, pedestrian_pre_post) |> 
+  filter(Yr == "2026") |> 
+  mutate(x1 = if_else(Mn == "pre-crisis", ymd("2026-01-01"), ymd("2026-03-01")),
+         x2 = if_else(Mn == "pre-crisis", ymd("2026-02-28"), ymd("2026-05-31")))
+
+gfit <- allgraph(gfdf)
+figuresave(x=gfit, fname="58_all")
+gfit
+```
+
+There is a general mode shift away from cars and towards other transport. As there is a baseline of more car use, small percentage drops in personal vehicle use are associate with large percentage increases of their baselines in other modes of transport.
+
+But it is not just mode shift. Checking the days of the week suggests less travel across all modes on (particularly) Wednesday and (less so) Monday. This does look a lot like what you would see if there was more work from home taking place.

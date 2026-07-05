@@ -1,0 +1,75 @@
+# Heavy vehicle (truck) changes
+
+Most of the discussion and caveats in the light vehicle counter sections. However, heavy vehicle use is more likely to be work only vehicles after the driver has commuted by other means, making the census background less relevant.
+
+Heavy vehicles are also more likely to be fuelled by diesel, which saw much larger price rises in relation to its base price than petrol.
+
+Finally, while heavy vehicle counters can (like light) be influenced by road works and diversions, that can also be influenced by construction works across a period providing a temporary destination for vehicles.
+
+```{r}
+# -----------------------------
+# 1. Libraries that are needed 
+# -----------------------------
+
+library(dplyr)
+library(readr)
+library(lubridate)
+library(slider)
+library(sf) # handling spaital data
+library(ggplot2) # making the map
+library(ggrepel) # if you want labels with lines
+source("../support_files/theme.R")
+source("../support_files/core_functions.R")
+
+# -----------------------------
+# Add counters
+# -----------------------------
+
+TMS_readings = NZTA_read_data("Heavy")
+basemap = create_basemap()
+
+# prepping the top layer
+bysubdivision = subdiv_before_after(TMS_readings)
+TMS_locations <- read_csv("../Data/NZTA/State_highway_traffic_monitoring_sites.csv") |> 
+  select(X,Y, subdivision=siteref)
+placed <- bysubdivision |> 
+  inner_join(TMS_locations,by = join_by(subdivision))
+```
+
+```{r}
+#| fig-cap: "2026 change in March-May daily heavy traffic counts compared to expectations based on 2025"
+# make a map
+countmap <- basemap +
+  geom_point(data=placed, aes(x=X,y=Y), size=0.5, colour="red") +
+  geom_label_repel(data=placed, aes(x=X,y=Y, label=delta_percent_format),
+                   max.overlaps = Inf, size=4, fill="#FFFFFF99",
+                   point.padding = 0.1, box.padding = .5,
+                   min.segment.length = 0) 
+figuresave(x=countmap, fname="46_heavy_by_counter")
+countmap
+
+```
+While the number of heavy vehicles counted in the two central city sites has increased, it is down through the rest of the counter network.
+
+
+```{r}
+#| fig-cap: "Rolling 7 day total heavy daily traffic counts"
+#trend
+trendata <- rolling7_total(TMS_readings)
+
+rollgraph <- rolling_graph(trendata)
+figuresave(x=rollgraph, fname="47_heavy_rolling7")
+rollgraph
+```
+As heavy vehicle use was noticeably higher in the early part of 2026 than 2025, it is harder to recognise the March-May decrease by eye when it is still at similar levels to 2025. But, like light vehicles, a couple of weeks after the outbreak of war sees a change.
+
+```{r}
+#| fig-cap: "Weekday percentage change in heavy traffic counts compared to 2025 expectations"
+## Weekday changes
+weekDayed <- aggregate_by_weekday(TMS_readings)
+wkplt <- weekplot(weekDayed)
+
+figuresave(x=wkplt, fname="48_heavy_weekdays")
+wkplt
+```
+The weekly pattern changes for heavy vehicles has a similar low Monday and lower Wednesday pattern to light vehicle counts. Sunday and Friday differ to light vehicles. 

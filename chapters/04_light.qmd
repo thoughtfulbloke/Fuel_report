@@ -1,0 +1,83 @@
+# Light vehicle (car) changes
+
+NZTA traffic count stations record the number of cars passing that station per day. So daily aggregation of the stations can either be a total across the network, an average across stations, or a more complex geographic imputation. 
+
+I tested both totalling and averaging, and found it didn't make much difference to the trend so chose to total. But this is all to make it clear we are counting sightings across observer stations not trips.
+
+The number of stations that I could use increased if I could include those missing a few days. As a 'balancing the data' response for incorporating those with missing entries I removed the entries for those days from all used counters. This means the rolling 7 day aggregates are sometimes 6 days.
+
+Individual counter traffic can be affected by things like road works and diversions as well a short term missing data. That is something to keep in mind when reviewing individual counters- changes can be the result of very local factors as well the general response of traffic at those counters to global actions.
+
+```{r}
+# -----------------------------
+# 1. Libraries that are needed 
+# -----------------------------
+
+library(dplyr)
+library(readr)
+library(lubridate)
+library(slider)
+library(sf) # handling spaital data
+library(ggplot2) # making the map
+library(ggrepel) # if you want labels with lines
+source("../support_files/theme.R")
+source("../support_files/core_functions.R")
+
+# -----------------------------
+# while the basemap is set up, we also need to add the NZTA
+# traffic counter locations to the station readings
+# -----------------------------
+
+TMS_readings = NZTA_read_data("Light")
+basemap = create_basemap()
+
+# prepping the top layer
+bysubdivision = subdiv_before_after(TMS_readings)
+TMS_locations <- read_csv("../Data/NZTA/State_highway_traffic_monitoring_sites.csv") |> 
+  select(X,Y, subdivision=siteref)
+placed <- bysubdivision |> 
+  inner_join(TMS_locations,by = join_by(subdivision))
+```
+
+```{r}
+#| fig-cap: "2026 change in March-May light daily traffic counts compared to expectations based on 2025"
+# make a map
+countmap <- basemap +
+  geom_point(data=placed, aes(x=X,y=Y), size=0.5, colour="red") +
+  geom_label_repel(data=placed, aes(x=X,y=Y, label=delta_percent_format),
+                   max.overlaps = Inf, size=4, fill="#FFFFFF99",
+                   point.padding = 0.1, box.padding = .5,
+                   min.segment.length = 0) 
+
+figuresave(x=countmap, fname="43_light_by_counter")
+countmap
+
+```
+The commonest drops in light vehicle counts are for 3-4% in the March to May period. If this equated directly to the number of people in the census it would be around 1,800 fewer car commuters, but counters have no way of detecting fullness of vehicles- car pooling consolidating into fewer cars and similar.
+
+
+```{r}
+#| fig-cap: "Rolling 7 day total light daily traffic counts"
+#trend
+trendata <- rolling7_total(TMS_readings)
+
+rollgraph <- rolling_graph(trendata)
+figuresave(x=rollgraph, fname="44_light_rolling7")
+rollgraph
+```
+It took around 2 weeks for traffic to consistently move from being above 2025 levels to being below. Fuel prices by then were well above historical levels, but had not yet peaked.
+
+I don't think too much should be read into details like the 2025 holiday minima being lower- we don't have enough data to indicate if it is something like more people left town by driving.
+
+```{r}
+#| fig-cap: "Weekday percentage change in light traffic counts compared to 2025 expectations"
+## Weekday changes
+weekDayed <- aggregate_by_weekday(TMS_readings)
+wkplt <- weekplot(weekDayed)
+
+figuresave(x=wkplt, fname="45_light_weekdays")
+wkplt
+
+
+```
+Checking the "by weekday" changes, it looks a lot like the changes in vehicle use are influenced by weekly cycles of life. Traffic is down Monday and Wednesday, with possible consolidation days following of less down or up traffic counts.

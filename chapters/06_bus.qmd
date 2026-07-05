@@ -1,0 +1,69 @@
+# Bus passenger changes
+
+Unlike traffic counter data, bus patronage data is a direct measure of people- it is people boarding buses in the network and tagging on (including transfers). 
+
+```{r}
+# -----------------------------
+# 1. Libraries that are needed 
+# -----------------------------
+
+library(dplyr)
+library(readr)
+library(lubridate)
+library(slider)
+library(sf) # handling spaital data
+library(ggplot2) # making the map
+library(ggrepel) # if you want labels with lines
+source("../support_files/theme.R")
+source("../support_files/core_functions.R")
+
+# -----------------------------
+# Bus data
+# -----------------------------
+
+basic_readings = bus_read_data()
+subdivided = subdiv_before_after(basic_readings)
+
+```
+
+```{r}
+#| fig-cap: "For bus routes present in 2025 and 2026, change in March-May bus passengers compared to expectations based on 2025"
+grf1 <- subdivided |> 
+  mutate(to_nearest = round(delta_percent,0)) |> 
+  #ggplot(aes(x = to_nearest)) +
+  ggplot(aes(x = delta_percent)) +
+  geom_histogram(binwidth = 5,fill = five_cols[3]) +
+  geom_vline(xintercept = 0, linewidth=0.05)+
+  #geom_dotplot(method = "histodot", binaxis = "x", stackdir = "up", binwidth=1, dotsize = 1, fill = five_cols[3]) +
+  theme_david() +
+  theme(axis.text.y.left = element_blank(),
+        axis.line.y.left = element_blank(),
+        axis.ticks.y.left = element_blank(),
+        axis.title.y.left= element_blank()) +
+  labs(x="Percentage change v. expected use")
+figuresave(x=grf1, fname="49_bus_routes")
+grf1
+```
+I haven't had time to unpick individual changes to routes that might have effected route specific use, but we can broadly say that the changes in the individual routes is consistent with a spread around the 11% higher use of the total network. This to me suggests it is a general change.
+
+
+```{r}
+#| fig-cap: "Rolling 7 day total daily bus patronage"
+#trend
+trendata <- rolling7_total(basic_readings)
+
+rollgraph <- rolling_graph(trendata)
+figuresave(x=rollgraph, fname="50_bus_rolling")
+rollgraph
+```
+The year began with passenger boarding numbers notably down on last year, associated with trade-offs in changes in fare structure. About a week after the outbreak of war, passenger numbers rose. This rise to levels equal to or above last year has remained for the full period.
+
+```{r}
+#| fig-cap: "Weekday percentage change in bus boardings compared to 2025 expectations"
+## Weekday changes
+weekDayed <- aggregate_by_weekday(basic_readings)
+wkplt <- weekplot(weekDayed)
+figuresave(x=wkplt, fname="51_bus_weekdays")
+wkplt
+```
+Bus changes are at their lowest on Wednesday and Monday, which mirrors both Light and Heavy Vehicles. Other weekdays have notably rises.

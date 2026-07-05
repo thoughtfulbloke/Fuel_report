@@ -1,0 +1,891 @@
+# 2023 Census background
+
+The 2026 transport data measures a range of things. Vehicle traffic counters measure the traffic at counter locations in the course of journeys. Cycle and pedestrian counters measure their own kinds of traffic at different locations. Bus boarding data measures people getting on buses starting their journey on that bus.
+
+All of these can be used to measure change in transport mode usage over time. The degree of change can be compared between different modes. But the data does not uniformly directly translate to a number of people figure.
+
+For a baseline, the 2023 census, via the Stats NZ Aotearoa data explorer, has main method of journey to work or study based on SA2 statistical areas. This is both from the perspective of the method by which people living in a SA2 area travelled to work/education, and for businesses and educational institutions in a SA2 area had people travel to them.
+
+## Graphs
+
+For each combination of main mode of travel, I am making 8 graphs so they are available for anyone interested
+
+1) Percentage of each SA2 using the mode of travel to work- this is an indicator of how important the mode was to that part of the city in 2023 for the obligate task of getting to work.
+
+2) Raw number of each SA2 using the mode of travel to work- this is an indicator of where a lot of people using that mode are living. A wider measure for the city.
+
+3) Percentage of each SA2 using the mode of travel to education- this is an indicator of how important the mode was to that part of the city in 2023 for the obligate task of getting to study. 
+
+4) Raw number of each SA2 using the mode of travel to study- this is an indicator of where a lot of people using that mode are living. A wider measure for the city of those studying.
+
+5) Percentage of people employed by a business with an address in a SA2 using a mode of travel to work- the opposite end of the trip from home, and home import are different means of getting people there.
+
+6) Raw number of people employed by a business with an address in a SA2 using a mode of travel to work- the day parking issue for those driving, but more generally a destination focus
+
+7) Percentage of people studying at an educational institute with an address in a SA2 using a mode of travel to work- how students are arriving at the place where they learn. The importance of modes to the institutions of that SA2 area.
+
+8) Raw number of people studying at an educational institute with an address in a SA2 using a mode of travel to work- The size of the student movements around town.
+
+## Transport Modes
+
+Working and Studying from home is a slightly different mode to others. Those doing so do need transport at other times, but do not need it as part of the obligate work/study commute. But we have no knowledge of how they are commuting at other times.
+
+Because they reflect the total people in the area, the percentages per SA2 statistical area for work from home is as a percentage of the total people who responded to the question. Other forms of travel are as a percent of the total people in movement - the percentage of travellers, rather than the percentage working or studying.
+
+The colour range of the individual visualisations, from very dark blue (low) to light green (high) are for the number range of that map, so colours are not directly comparable between maps.
+
+```{r}
+library(dplyr)
+library(readr)
+library(lubridate)
+library(sf) # handling spaital data
+library(ggplot2) # making the map
+library(ggrepel) # if you want labels with lines
+source("../support_files/core_functions.R")
+#-----------------------------
+  area_latlong <- declare_area_LL()
+  bbox_ll <- make_boundingbox_LL(area_latlong)
+  bbox_nztm <- st_bbox(st_transform(st_as_sfc(bbox_ll), 2193))
+  gpkg <- "../Data/OSM/dunedin_osm_layers.gpkg"
+  actualroads <- st_read(gpkg, layer = "polyroads", quiet = TRUE)
+    crop_layer <- function(x, bbox) {
+    st_agr(x) <- "constant"
+    if (!is.null(x) && nrow(x) > 0) {
+      st_crop(x, bbox)
+    } else {
+      x
+    }
+    }
+    actualroads_c <- crop_layer(actualroads, bbox_nztm)
+#
+basemap <- create_basemap()
+sa2 <- read_sf("../Data/StatsNZ/statsnz-statistical-area-2-2023-clipped-generalised-KML/statistical-area-2-2023-clipped-generalised.kml")
+sa2_nztm <- st_transform(sa2, 2193)
+```
+
+```{r}
+
+# census data with SA2 names
+
+## Going to work
+censusWgoing <- read_csv("../Data/Census/Cen23_Transport_WORK_by_Res_Loc.csv") |> 
+  filter(Age == "Total - age") |> 
+  arrange(`Area`, `Main means of travel to work`) |>
+  mutate(OBS_VALUE = ifelse(is.na(OBS_VALUE), 1, OBS_VALUE)) |> 
+  summarise(.by=`Area`,
+            bike =  sum((`Main means of travel to work` == "Bicycle")*OBS_VALUE),
+            nowork =  sum((`Main means of travel to work` == "Did not go to work today")*OBS_VALUE),
+            ccar = sum((`Main means of travel to work` == "Drive a company car, truck or van")*OBS_VALUE),
+            pcar = sum((`Main means of travel to work` == "Drive a private car, truck or van")*OBS_VALUE),
+            frry = sum((`Main means of travel to work` == "Ferry")*OBS_VALUE),
+            notelsewhere = sum((`Main means of travel to work` == "Not elsewhere included")*OBS_VALUE),
+            other = sum((`Main means of travel to work` == "Other")*OBS_VALUE),
+            psng = sum((`Main means of travel to work` == "Passenger in a car, truck, van or company bus")*OBS_VALUE),
+            pbus = sum((`Main means of travel to work` == "Public bus")*OBS_VALUE),
+            train = sum((`Main means of travel to work` == "Train")*OBS_VALUE),
+            walk = sum((`Main means of travel to work` == "Walk or jog")*OBS_VALUE),
+            WFH = sum((`Main means of travel to work` == "Work at home")*OBS_VALUE)
+            ) |> 
+  mutate(travellers = bike + ccar + pcar + frry + notelsewhere + other + psng +
+           pbus + train + walk,
+         stated = travellers + nowork + WFH) |> 
+  rename(Name = Area)
+
+## Going to study
+censusSgoing <- read_csv("../Data/Census/Cen23_Transport_EDU_by_Res_Loc.csv") |> 
+  filter(Age == "Total - age") |> 
+  arrange(`Area`, `Main means of travel to education`) |>
+  mutate(OBS_VALUE = ifelse(is.na(OBS_VALUE), 1, OBS_VALUE)) |> 
+  summarise(.by=`Area`,
+            bike =  sum((`Main means of travel to education` == "Bicycle")*OBS_VALUE),
+            dcar = sum((`Main means of travel to education` == "Drive a car, truck or van")*OBS_VALUE),
+            frry = sum((`Main means of travel to education` == "Ferry")*OBS_VALUE),
+            notelsewhere = sum((`Main means of travel to education` == "Not elsewhere included")*OBS_VALUE),
+            other = sum((`Main means of travel to education` == "Other")*OBS_VALUE),
+            psng = sum((`Main means of travel to education` == "Passenger in a car, truck or van")*OBS_VALUE),
+            pbus = sum((`Main means of travel to education` == "Public bus")*OBS_VALUE),
+            sbus = sum((`Main means of travel to education` == "School bus")*OBS_VALUE),
+            SFH = sum((`Main means of travel to education` == "Study at home")*OBS_VALUE),
+            train = sum((`Main means of travel to education` == "Train")*OBS_VALUE),
+            walk = sum((`Main means of travel to education` == "Walk or jog")*OBS_VALUE)) |>
+  mutate(travellers = bike + dcar + frry + notelsewhere + other + psng +
+           pbus + sbus + train + walk,
+         stated = travellers + SFH) |> 
+  rename(Name = Area)
+
+## Coming to work
+censusWcoming <- read_csv("../Data/Census/Cen23_Transport_WORK_by_Work_Loc.csv") |> 
+  filter(Age == "Total - age") |> 
+  rename(Area = `Workplace address`) |> 
+  arrange(`Area`, `Main means of travel to work`) |>
+  mutate(OBS_VALUE = ifelse(is.na(OBS_VALUE), 1, OBS_VALUE)) |> 
+  summarise(.by=`Area`,
+            bike =  sum((`Main means of travel to work` == "Bicycle")*OBS_VALUE),
+            nowork =  sum((`Main means of travel to work` == "Did not go to work today")*OBS_VALUE),
+            ccar = sum((`Main means of travel to work` == "Drive a company car, truck or van")*OBS_VALUE),
+            pcar = sum((`Main means of travel to work` == "Drive a private car, truck or van")*OBS_VALUE),
+            frry = sum((`Main means of travel to work` == "Ferry")*OBS_VALUE),
+            notelsewhere = sum((`Main means of travel to work` == "Not elsewhere included")*OBS_VALUE),
+            other = sum((`Main means of travel to work` == "Other")*OBS_VALUE),
+            psng = sum((`Main means of travel to work` == "Passenger in a car, truck, van or company bus")*OBS_VALUE),
+            pbus = sum((`Main means of travel to work` == "Public bus")*OBS_VALUE),
+            train = sum((`Main means of travel to work` == "Train")*OBS_VALUE),
+            walk = sum((`Main means of travel to work` == "Walk or jog")*OBS_VALUE),
+            WFH = sum((`Main means of travel to work` == "Work at home")*OBS_VALUE)
+            ) |> 
+  mutate(travellers = bike + ccar + pcar + frry + notelsewhere + other + psng +
+           pbus + train + walk,
+         stated = travellers + nowork + WFH) |> 
+  rename(Name = Area)
+
+## Coming to study
+censusScoming <- read_csv("../Data/Census/Cen23_Transport_EDU_by_Edu_Loc.csv") |> 
+  filter(Age == "Total - age") |>  
+  rename(Area = `Educational institution address`) |> 
+  arrange(`Area`, `Main means of travel to education`) |>
+  mutate(OBS_VALUE = ifelse(is.na(OBS_VALUE), 1, OBS_VALUE)) |> 
+  summarise(.by=`Area`,
+            bike =  sum((`Main means of travel to education` == "Bicycle")*OBS_VALUE),
+            dcar = sum((`Main means of travel to education` == "Drive a car, truck or van")*OBS_VALUE),
+            frry = sum((`Main means of travel to education` == "Ferry")*OBS_VALUE),
+            notelsewhere = sum((`Main means of travel to education` == "Not elsewhere included")*OBS_VALUE),
+            other = sum((`Main means of travel to education` == "Other")*OBS_VALUE),
+            psng = sum((`Main means of travel to education` == "Passenger in a car, truck or van")*OBS_VALUE),
+            pbus = sum((`Main means of travel to education` == "Public bus")*OBS_VALUE),
+            sbus = sum((`Main means of travel to education` == "School bus")*OBS_VALUE),
+            SFH = sum((`Main means of travel to education` == "Study at home")*OBS_VALUE),
+            stated = sum((`Main means of travel to education` == "Total stated - main means of travel to education")*OBS_VALUE),
+            train = sum((`Main means of travel to education` == "Train")*OBS_VALUE),
+            walk = sum((`Main means of travel to education` == "Walk or jog")*OBS_VALUE)) |>
+  mutate(travellers = bike + dcar + frry + notelsewhere + other + psng +
+           pbus + sbus + train + walk,
+         stated = travellers + SFH) |> 
+  rename(Name = Area)
+
+makecensusmap <- function(x, legendname="Percent", undermap=basemap, overroads = actualroads_c){
+  undermap + 
+  geom_sf(data=x, aes(geometry=geometry, fill=targetn),
+          colour=NA, lwd=1)  +
+  # Actual Roads
+  geom_sf(data=overroads, fill=NA, colour="grey93", lwd=.04) +
+  scale_fill_viridis_c(name=legendname,option="D", end=.8)
+}
+
+
+```
+
+## Work/Study from Home
+
+Working or studying from home is being provided for illustrative purposes. The rates do not directly equate to working or studying in the Dunedin area, as working from home can be living at one's rural workplace, basing one's workplace in one's home, working remotely to anywhere, or studying to anywhere.
+
+Similarly, for organisations with people working/studying from home, those people can be far distant. But it does reflect earning an income or studying without the requirement for travel, which I think is a useful thing to keep in mind about affected people.
+
+### For homes in the SA2 areas
+
+```{r}
+#| fig-cap: "The percentage of workers in a SA2 area who are working from home."
+
+census <- censusWgoing |> 
+  mutate(targetn = round(100*WFH/stated,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="03_residents_WFH_percent")
+cmap
+```
+
+For most of the city SA2 areas, those residents of an area working from home are in the 9-16% range.
+
+```{r}
+#| fig-cap: "The raw number of workers in a SA2 area who are working from home."
+
+census <- censusWgoing |> 
+  mutate(targetn = WFH,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="04_residents_WFH_number")
+cmap
+```
+Much of the SA2 areas in the city have 50 to 200 workers who are working from their residences. About 8000 workers in SA2 areas appearing on the map are working from home.
+
+```{r}
+#| fig-cap: "The percentage of students in a SA2 area who are studying from home."
+
+census <- censusSgoing |> 
+  mutate(targetn = round(100*SFH/stated,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="05_students_SFH_percent")
+cmap
+```
+Outside of the area most tertiary students live, and some live in hostels, the percentage of people studying from home is in the 5-10% range.
+
+```{r}
+#| fig-cap: "The raw number of students in a SA2 area who are studying from home."
+
+census <- censusSgoing |> 
+  mutate(targetn = SFH,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="06_students_SFH_number")
+cmap
+```
+
+The specific location of student hostels can have a profound effect on the raw numbers of studying from one's residence (or residing in one's study), but most SA2 areas have been 30 and 60 residents studying from home. Over the visualised area, about 2200 students were studying from home.
+
+### For workplaces & educational institutions in the SA2 areas
+
+```{r}
+#| fig-cap: "The percentage of workers of businesses in a SA2 area who are working from home."
+
+census <- censusWcoming |> 
+  mutate(targetn = round(100*WFH/stated,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="07_region_WFH_percent")
+cmap
+```
+Among workplaces headquartered in SA2 areas, the percentage of workers working from home (both living at the workplace and working remotely) is very patchwork. But for businesses in the central city it is very low, and rural areas it is high.
+
+```{r}
+#| fig-cap: "The raw number of workers of businesses in a SA2 area who are working from home."
+
+census <- censusWcoming |> 
+  mutate(targetn = WFH,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="08_region_WFH_number")
+cmap
+```
+
+The number of employees of businesses working from home ranges from under 50 in coastal main city SA2 areas, to 100-200 in the rural outer parts of the city. Overall the number of residents working from home is very close to the number of working from home workers in workplaces, suggesting remote work is either negligible or cancels out in in/out remoteness from the study area. 
+
+
+```{r}
+#| fig-cap: "The percentage of students of educational institutes in a SA2 area who are studying from home."
+
+census <- censusScoming |> 
+  mutate(targetn = round(100*SFH/stated,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="09_region_SFH_percent")
+cmap
+```
+SA2 blocks where the only educational institution present is residential can contain very, very study high from home percentages. But for most of the city with more educational places is below 20%.
+
+```{r}
+#| fig-cap: "The raw number of students of educational institutes in a SA2 area who are studying from home."
+
+census <- censusScoming |> 
+  mutate(targetn = SFH,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="10_region_SFH_number")
+cmap
+```
+
+Educational Locations with residential students tend to be boarding schools (large numbers in a SA2) or homeschools (normally low numbers in a SA2). As with workers, the Study from Home by location of educational institute is very similar to students studying from home.
+
+## Car use
+
+Driving (and being a driver's passenger) for obligate times reflects both driving required to earn a living and driving at peak (least efficient journey) times.
+
+### For homes in the SA2 areas
+
+```{r}
+#| fig-cap: "The percentage of workers in a SA2 area who are driving to work or a passenger."
+
+census <- censusWgoing |> 
+  mutate(targetn = round(100*(ccar+pcar+psng)/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="11_resident_carw_percent")
+cmap
+```
+
+The general pattern, among those working but not working from home, is the further out of town you live, the more likely you are to be using a car. A minority in the central city, and a near totality of commuting workers who live in the outer rural edges of the city.
+
+
+```{r}
+#| fig-cap: "The raw number of workers in a SA2 area who are driving to work or a passenger."
+
+census <- censusWgoing |> 
+  mutate(targetn = (ccar+pcar+psng),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="12_resident_carw_number")
+cmap
+```
+For the raw numbers of car travelling workers, many are driving from newer satellite suburbs. Close to 45,000 workers were drivers or passengers.
+
+```{r}
+#| fig-cap: "The percentage of students in a SA2 area who are driving or a passenger"
+
+census <- censusSgoing |> 
+  mutate(targetn = round(100*(dcar+psng)/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="13_resident_cars_percent")
+cmap
+```
+
+Students going to study reflects a similar core/periphery relationship to those travelling to work. Though the extremes of driving and being driven are not as great as with work.
+
+```{r}
+#| fig-cap: "The raw number of students in a SA2 area who are driving or being driven to study."
+
+census <- censusSgoing |> 
+  mutate(targetn = (dcar+psng),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="14_resident_cars_number")
+cmap
+```
+
+In the very geographically similar to driving to work map, students are slightly more than a third of car commuters at nearly 16,000.
+
+### For workplaces & educational institutions in the SA2 areas
+
+
+```{r}
+#| fig-cap: "The percentage of workers of businesses in a SA2 area who are travelling by car."
+
+census <- censusWcoming |> 
+  mutate(targetn = round(100*(ccar+pcar+psng)/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="15_region_carw_percent")
+cmap
+```
+Among workplaces headquartered in SA2 areas, the percentage of workers arriving via car is at their lowest in the tertiary area of the city.
+
+```{r}
+#| fig-cap: "The raw number of workers of businesses in a SA2 area who are arriving via car."
+
+census <- censusWcoming |> 
+  mutate(targetn = (ccar+pcar+psng),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="16_region_carw_number")
+cmap
+```
+
+In raw numbers rather than percentages, businesses in the central city have the most workers arriving by car.
+
+
+```{r}
+#| fig-cap: "The percentage of students of educational institutes in a SA2 area who are driving or driven."
+
+census <- censusScoming |> 
+  mutate(targetn = round(100*(dcar+psng)/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="17_region_cars_percent")
+cmap
+```
+There are some subtleties around where students are coming from, and what kind of educational places are in that area, in the percentage of students are arriving by car.
+
+```{r}
+#| fig-cap: "The raw number of students of educational institutes in a SA2 area who driving or driven."
+
+census <- censusScoming |> 
+  mutate(targetn = (dcar+psng),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="18_region_cars_number")
+cmap
+```
+
+The raw number figures have a very different distribution. to the percentages because the total pool of students attending institutions in different SA2 areas are of very different sizes.
+
+## Bus use
+
+For workers this is transport via a public bus. For students this is transport either by public bus or school bus.
+
+### For homes in the SA2 areas
+
+```{r}
+#| fig-cap: "The percentage of workers in a SA2 area who bus to work."
+
+census <- censusWgoing |> 
+  mutate(targetn = round(100*pbus/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="19_resident_busw_percent")
+cmap
+```
+
+Unsurprisingly given routes, there is an inland rural vs coastal urban divide on using the bus to get to work.
+
+
+```{r}
+#| fig-cap: "The raw number of workers in a SA2 area who are bussing to work."
+
+census <- censusWgoing |> 
+  mutate(targetn = pbus,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="20_resident_busw_number")
+cmap
+```
+For the raw numbers of bussing workers, it is pretty similar to the percentages as a pattern. About 3,000 workers caught the bus in the census.
+
+```{r}
+#| fig-cap: "The percentage of students in a SA2 area who are bussing"
+
+census <- censusSgoing |> 
+  mutate(targetn = round(100*(pbus + sbus)/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="21_resident_buss_percent")
+cmap
+```
+The differences between workers going to work and students going to study shows the importance of some school bus routes.
+
+```{r}
+#| fig-cap: "The raw number of students in a SA2 area who are bussing to study."
+
+census <- censusSgoing |> 
+  mutate(targetn = (pbus + sbus),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="22_resident_buss_number")
+cmap
+```
+
+Hot spots which are not hotspots in the percentage map are areas where a lot of people of education-busing age are living. Nearly 3,200 students are busing to school in the census.
+
+### For workplaces & educational institutions in the SA2 areas
+
+
+```{r}
+#| fig-cap: "The percentage of workers of businesses in a SA2 area who are bussing."
+
+census <- censusWcoming |> 
+  mutate(targetn = round(100*pbus/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="23_region_busw_percent")
+cmap
+```
+As well as the inner central city, the Andersons Bay/ Bayfield area has a high level of workers arriving by bus.
+
+```{r}
+#| fig-cap: "The raw number of workers of businesses in a SA2 area who are arriving via bus."
+
+census <- censusWcoming |> 
+  mutate(targetn = pbus,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="24_region_busw_number")
+cmap
+```
+
+In raw numbers, it is very clear that regardless of where workers are coming from, they are bussing to employers in the inner city and tertiary area.
+
+
+```{r}
+#| fig-cap: "The percentage of students of educational institutes in a SA2 area who are bussing."
+
+census <- censusScoming |> 
+  mutate(targetn = round(100*(pbus + sbus)/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="25_region_buss_percent")
+cmap
+```
+In general, areas containing high schools have higher levels of students arriving by bus. Which is not too surprising about the nature of bussing.
+
+```{r}
+#| fig-cap: "The raw number of students of educational institutes in a SA2 area who driving or driven."
+
+census <- censusScoming |> 
+  mutate(targetn = (pbus + sbus),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="26_region_buss_number")
+cmap
+```
+
+The raw number figures are again a very different distribution to the percentages, again because the total pool of students attending institutions in different SA2 areas are of very different sizes.
+
+
+## Cycle use
+
+The Ōtepoti/Dunedin cycle network has expanded since 2023. While the change between 2025 and 2026 can be treated as comparable, the 2023 census figures should be treated as a lower bound. There have also been major changes in e-bike availability which may have disrupted the relationship between flatness and cycling. This may have particularly effected the non-flat SA2 areas.
+
+### For homes in the SA2 areas
+
+```{r}
+#| fig-cap: "The percentage of workers in a SA2 area who cycle to work."
+
+census <- censusWgoing |> 
+  mutate(targetn = round(100*bike/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="27_resident_cycw_percent")
+cmap
+```
+
+Cycling to work in 2023 was mainly from near inner Dunedin flat areas.
+
+
+```{r}
+#| fig-cap: "The raw number of workers in a SA2 area who are cycling to work."
+
+census <- censusWgoing |> 
+  mutate(targetn = bike,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="28_resident_cycw_number")
+cmap
+```
+For the raw numbers of cycling workers, routes from the Southern and Peninsula coast become more important when looking at total numbers (about 1,700) of cyclists commuting to work.
+
+```{r}
+#| fig-cap: "The percentage of students in a SA2 area who are cycling to their study"
+
+census <- censusSgoing |> 
+  mutate(targetn = round(100*bike/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="29_resident_cycs_percent")
+cmap
+```
+
+Students cycling are a bit more pervasive than adults cycling to work in Mosgiel, likely reflecting distance to destination.
+
+```{r}
+#| fig-cap: "The raw number of students in a SA2 area who are cycling to study."
+
+census <- censusSgoing |> 
+  mutate(targetn = bike,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="30_resident_cycs_number")
+cmap
+```
+
+The North East Valley, Mosgiel, and St. Kilda are strongly contributing to the total number of cycling students (a little over 1000).
+
+### For workplaces & educational institutions in the SA2 areas
+
+
+```{r}
+#| fig-cap: "The percentage of workers of businesses in a SA2 area who are cycling"
+
+census <- censusWcoming |> 
+  mutate(targetn = round(100*bike/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="31_region_cycw_percent")
+cmap
+```
+
+Workplaces in Portobello show up with a high proportion of cyclist workers.
+
+```{r}
+#| fig-cap: "The raw number of workers of businesses in a SA2 area who are cycling"
+
+census <- censusWcoming |> 
+  mutate(targetn = bike,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="32_region_cycw_number")
+cmap
+```
+
+The core inner city has a high number of cyclist workers, though it was a low percentage of the total number of workers.
+
+
+```{r}
+#| fig-cap: "The percentage of students of educational institutes in a SA2 area who are cycling"
+
+census <- censusScoming |> 
+  mutate(targetn = round(100*bike/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="33_region_cycs_percent")
+cmap
+```
+For cycling to education, Mosgiel shows up as an "island" of local cycling separate from the rest of the city.
+
+```{r}
+#| fig-cap: "The raw number of students of educational institutes in a SA2 area who cycling"
+
+census <- censusScoming |> 
+  mutate(targetn = bike,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="34_region_cycs_number")
+cmap
+```
+
+The raw number of cyclists are arriving to the tertiary area, and some in Mosgiel.
+
+
+## Walking
+
+
+### For homes in the SA2 areas
+
+```{r}
+#| fig-cap: "The percentage of workers in a SA2 area who walked to work."
+
+census <- censusWgoing |> 
+  mutate(targetn = round(100*walk/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="35_resident_pedw_percent")
+cmap
+```
+
+Walking to work is the inverse of driving. Highest in the core inner city.
+
+
+```{r}
+#| fig-cap: "The raw number of workers in a SA2 area who are walking to work."
+
+census <- censusWgoing |> 
+  mutate(targetn = walk,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="36_resident_pedw_number")
+cmap
+```
+The raw numbers (about 5800 in total) and percentages have a very similar range.
+
+```{r}
+#| fig-cap: "The percentage of students in a SA2 area who are walking to their study"
+
+census <- censusSgoing |> 
+  mutate(targetn = round(100*walk/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="37_resident_peds_percent")
+cmap
+```
+
+Students walking is strongly affected by the tertiary region.
+
+```{r}
+#| fig-cap: "The raw number of students in a SA2 area who are walking to study."
+
+census <- censusSgoing |> 
+  mutate(targetn = walk,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="38_resident_peds_number")
+cmap
+```
+
+Again the tertiary area creates a long shadow of the total (around 15,000) walking students.
+
+### For workplaces & educational institutions in the SA2 areas
+
+
+```{r}
+#| fig-cap: "The percentage of workers of businesses in a SA2 area who are walking"
+
+census <- censusWcoming |> 
+  mutate(targetn = round(100*walk/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="39_region_pedw_percent")
+cmap
+```
+Outside of the central and rural areas, workplaces for most of the city are in 6-12% of employees working.
+
+```{r}
+#| fig-cap: "The raw number of workers of businesses in a SA2 area who are walking."
+
+census <- censusWcoming |> 
+  mutate(targetn = walk,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="40_region_pedw_number")
+cmap
+```
+
+The core inner city has a high number of walking workers, though it was a medium percentage of the total (large) number of workers.
+
+
+```{r}
+#| fig-cap: "The percentage of students of educational institutes in a SA2 area who are walking"
+
+census <- censusScoming |> 
+  mutate(targetn = round(100*walk/travellers,0),
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Percent")
+figuresave(x=cmap, fname="41_region_peds_percent")
+cmap
+```
+
+Educational locations in upper North East Valley have a near 100% students arriving by walking.
+
+```{r}
+#| fig-cap: "The raw number of students of educational institutes in a SA2 area who walking."
+
+census <- censusScoming |> 
+  mutate(targetn = walk,
+         targetn = ifelse(is.nan(targetn), 0, targetn))
+censa <- sa2_nztm |> inner_join(census, by="Name")
+sa2c <- st_crop(censa, bbox_nztm)
+
+
+cmap <- makecensusmap(sa2c, legendname="Raw\nnumber")
+figuresave(x=cmap, fname="42_region_peds_number")
+cmap
+```
+
+The raw number of walkers are arriving to the tertiary area swamps all others by a massive amount. While there are more than a dozen SA2 areas where educational institutions have hundreds walking to school, the tertiary area has around 11,000.
+
+
+
+

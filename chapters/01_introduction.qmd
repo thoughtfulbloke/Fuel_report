@@ -1,0 +1,98 @@
+# Introduction
+
+As I, as a pedestrian in Ōtepoti/Dunedin, have been making my way to work, I have been remarking to other pedestrians that "there seem to be a big change in the number of people you see on the street". 
+
+Being a data person, I wanted to bring together all the data I could for an overview. This is it.
+
+The analysis was carried out in R, with all analysis code available in the GitHub repo of:
+
+https://github.com/thoughtfulbloke/Fuel_report
+
+All graphs in this document are available individually there in the Figures_standalone folder.
+
+The Code is MIT licenced, so basically it is fine for anyone to draw from. But while the data is open, I thought you should go back to the original sources, as it is being provided by others.
+
+## Acknowledgements and sources
+
+This is all based on public available or requestable data
+
+### Fuel prices
+
+Fuel price data is based on the national New Zealand average board prices in the MBIE weekly fuel price monitoring data.
+
+https://www.mbie.govt.nz/building-and-energy/energy-and-natural-resources/energy-statistics-and-modelling/energy-statistics/weekly-fuel-price-monitoring
+
+### Food prices 
+
+Food prices are based on the Stats NZ food price index, available as part of Stats NZ selected prices.
+
+https://www.stats.govt.nz/information-releases/selected-price-indexes-may-2026/
+
+Though available as a Selected Prices csv at:
+
+https://www.stats.govt.nz/large-datasets/csv-files-for-download/
+
+### Census Travel Data
+
+2023 census data on travel to work or study by SA2 area is from the Aotearoa Data Explorer
+
+https://explore.data.stats.govt.nz
+
+### Map visualisation data
+
+The SA2 geographic boundaries used in visualising census maps are via the Stats NZ Geographic Data Service
+
+https://catalogue.data.govt.nz/dataset/statistical-area-2-2023-clipped-generalised
+
+https://datafinder.stats.govt.nz/layer/111206-statistical-area-2-2023-clipped-generalised/
+
+The underlying geographic features for the Dunedin area were downloaded from OpenStreetMap 
+
+https://www.openstreetmap.org
+
+However, I supplemented the OpenStreetMap data with the Land Information New Zealand roads data file to show main roads 
+
+https://data.linz.govt.nz/layer/50329-nz-road-centrelines-topo-150k/
+
+### Vehicle data
+
+Vehicle counter data, both for light (car) and heavy (truck) is from NZTA Open Data
+
+https://opendata-nzta.opendata.arcgis.com/datasets/898e77d403c443c4961ada073d144735_0/explore
+
+Traffic Counter Locations is also from NZTA Open Data
+
+https://opendata-nzta.opendata.arcgis.com/datasets/b90f8908910f44a493c6501c3565ed2d_0
+
+### Bus patronage
+
+Data on daily numbers boarding buses, by route of bus, is courtesy of a request to the Otago Regional Council.
+
+### Cycle counts and pedestrian counts
+
+While these are managed by both NZTA and the Dunedin City Council, data is publicly available from the Dunedin City Council at 
+
+https://www.dunedin.govt.nz/community-facilities/cycling/cycle-counter-dashboard
+
+I am using the data contained in this dashboard in a more convenient spreadsheet, courtesy of a request to the Dunedin Regional Council.
+
+## The key calculation
+
+The calculation being used is change in daily average transport use since before the war, in relation to the annual pattern of last year.
+
+If the daily average of March to May 2025 is 10% below the daily average of January to February 2025, and the daily average of March to May 2026 is 2% above the daily average of January to February 2026, then we are describing 2026 traffic as being 12% (2% - -10%) higher than expected.
+
+For the headline numbers, the is the daily average across the entire March to May period, so this incorporates the full April Holiday periods, even though they were in different times in April it all balances out.
+
+Traffic changes didn't necessarily begin at the immediate outbreak of war, as it took a few weeks for fuel price changes to flow through, but it makes a convenient common point for before/after comparisons. The changes for the time since the mode changed are slightly more extreme if the period of continued normalcy is excluded.
+
+The detailed individual mode summaries include things like seven day rolling averages, where care should be used if directly comparing to the same time in 2025, as in year events like Easter take place at different times.
+
+To make shorter term calculations, I shifted the date of 2025 days by 1 day to match the 2025 and 2026 day of the week. So, for example, Monday March 17th 2025 is being matched to Monday March 16th 2026.
+
+Where traffic counters are being aggregated I have chosen to use the daily average of the sum of the counters for counters available through the period, rather than an average across all counters. I checked both ways of aggregating and found that, in practice, it didn't change the overall outcomes. 
+
+
+## No conflicts of interest
+
+This is a personal project of understanding, I have no financial or other connections with any transport related entities. I occasionally drive a car to support others, and walk to and from work.

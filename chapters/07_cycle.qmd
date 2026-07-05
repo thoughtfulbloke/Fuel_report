@@ -1,0 +1,76 @@
+# Cycle count changes
+
+As counter data, the cycle count data is similar to vehicle count data. It has similar issues around road works etc affecting individual counter results.
+
+```{r}
+# -----------------------------
+# 1. Libraries etc
+# -----------------------------
+
+library(dplyr)
+library(readr)
+library(lubridate)
+library(slider)
+library(sf) # handling spaital data
+library(ggplot2) # making the map
+library(ggrepel) # if you want labels with lines
+source("../support_files/theme.R")
+source("../support_files/core_functions.R")
+
+# -----------------------------
+# topmap
+# -----------------------------
+
+cycle_readings = cycle_read_data()
+basemap = create_basemap()
+
+# prepping the top layer
+subdivided = subdiv_before_after(cycle_readings)
+cycle_latlong <- read_csv("../Data/DCC/counternames.csv") |> 
+  filter(type=="cycle")
+sf_points <- st_as_sf(cycle_latlong, coords = c("long", "lat"), crs = 4326)
+sf_nztm <- st_transform(sf_points, crs = 2193)
+coords <- st_coordinates(sf_nztm)
+cycle_latlong$X <- coords[,1]
+cycle_latlong$Y <- coords[,2]
+
+placed <- cycle_latlong |> 
+  rename(subdivision = countloc) |> 
+  inner_join(subdivided, by = join_by(subdivision)) 
+```
+
+```{r}
+#| fig-cap: "For counters available in 2025 and 2026, 2026 change in March-May cycle traffic counts compared to expectations based on 2025"
+# make a map
+m1 <- basemap +
+  geom_point(data=placed, aes(x=X,y=Y), size=0.5, colour="red") +
+  geom_label_repel(data=placed, aes(x=X,y=Y, label=delta_percent_format),
+                   max.overlaps = Inf, size=4, fill="#FFFFFF99",
+                   point.padding = 0.1, box.padding = .5,
+                   min.segment.length = 0) 
+figuresave(x=m1, fname="52_cycle_counters")
+m1
+```
+Many of the individual cycle counters around town are up from between 15% and 25%. Another set of peripheral sites are in the 0-9% range. A few outliers have other readings.
+
+
+```{r}
+#| fig-cap: "Rolling 7 day total daily cycle counts"
+#trend
+trendata <- rolling7_total(cycle_readings)
+rollgraph <- rolling_graph(trendata)
+figuresave(x=rollgraph, fname="53_cycle_rolling")
+rollgraph
+```
+The year began with noticeably lower total daily cycle counts, which (like bussing) a week after the war outbreak rose to levels the same or above 2025 based expectations.
+
+```{r}
+#| fig-cap: "Weekday percentage change in cycle counts compared to 2025 expectations"
+## Weekday changes
+weekDayed <- aggregate_by_weekday(cycle_readings)
+wkplt <- weekplot(weekDayed)
+figuresave(x=wkplt, fname="54_cycle_weekdays")
+wkplt
+
+```
+As with vehicles or buses, cyclists are lower on a Wednesday, and Monday has the second lowest growth compared to expectations. This does seem to be a general trend in degree of movement, rather than just the means of movement. 

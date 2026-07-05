@@ -1,0 +1,64 @@
+# Fuel prices
+
+```{r}
+library(readr)
+library(dplyr)
+library(lubridate)
+library(slider)
+library(knitr)
+source("../support_files/theme.R")
+```
+National fuel board prices suggest people using diesel or petrol have been paying between \$0.70 and \$1.50 more a litre for fuel (depending on fuel type). This price has been largely stable for March to May, creating ongoing household costs. With the way fuel is incorporated into things like food productions, people expect there will still be cost of living pressures long after any future drop in fuel prices.
+
+\vspace*{1.0\baselineskip}
+```{r}
+#| fig-cap: "2026 Weekly average national fuel price. Source: MBIE"
+
+raw_fuel <- read_csv("../Data/MBIE/weekly-table.csv")
+fuel_2026 <- raw_fuel |> 
+  filter(Variable == "Board price",
+         year(Date) == 2026)
+
+grfl <- ggplot(fuel_2026, aes(x=Date -days(3), y=Value, colour=Fuel)) + 
+  geom_line() + coord_cartesian(ylim=c(0,NA))+
+  scale_colour_manual(name="Fuel type: ",
+                      values=five_cols[c(1,3,5)]) +
+  theme_minimal() +
+  labs(x=NULL, y="cents per litre")+
+  theme(legend.position = "bottom",
+        panel.grid = element_line(colour="#EEEEEE"))
+
+figuresave(x=grfl, fname="01_fuelprices")
+grfl
+```
+
+Food inputs such has fertiliser (which require fossil fuels) have months of lag time before price changes are fully worked through. And Food is not a flattening price trend at the present. 
+
+```{r}
+#| fig-cap: "Rolling 12 month average food price index 2024 to present. Source: Stats NZ selected prices"
+selected <- read_csv("../Data/StatsNZ/selected-price-indexes-may-2026.csv")
+# https://www.stats.govt.nz/information-releases/selected-price-indexes-may-2026/
+food <- selected |> 
+  filter(Series_title_1 == "Food", 
+         UNITS=="Index") |> 
+  arrange(Period) |> 
+  mutate(Yr = floor(Period),
+         Mn = round(100*(Period-Yr),0),
+         Date_is = ISOdate(Yr,Mn,15),
+         roll12 = slide_dbl(Data_value,function(x){mean(x)},
+                           .before = 11, 
+                           .after = 0,
+                           .complete = TRUE)) |> 
+  filter(!is.na(roll12), year(Date_is) > 2023 ) |> 
+  select(Date_is, roll12)
+
+gffd <- ggplot(food, aes(x=Date_is, y=roll12)) + 
+  geom_line() +
+  theme_david() +
+  labs(x=NULL, y="Rolling 12 month prices")
+
+figuresave(x=gffd, fname="02_foodprices")
+gffd
+```
+
+

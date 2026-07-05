@@ -1,0 +1,77 @@
+# Pedestrian counter changes
+
+Pedestrian counters are also available from the Dunedin City Council, though there are fewer of them than cycle counters.
+
+```{r}
+# -----------------------------
+# 1. Libraries 
+# -----------------------------
+
+library(dplyr)
+library(readr)
+library(lubridate)
+library(slider)
+library(sf) # handling spaital data
+library(ggplot2) # making the map
+library(ggrepel) # if you want labels with lines
+source("../support_files/theme.R")
+source("../support_files/core_functions.R")
+
+# -----------------------------
+# top layer
+# -----------------------------
+
+basic_readings = pedestrian_read_data()
+basemap = create_basemap()
+
+# prepping the top layer
+subdivided = subdiv_before_after(basic_readings)
+counter_latlong <- read_csv("../Data/DCC/counternames.csv") |> 
+  filter(type=="pedestrian")
+sf_points <- st_as_sf(counter_latlong, coords = c("long", "lat"), crs = 4326)
+sf_nztm <- st_transform(sf_points, crs = 2193)
+coords <- st_coordinates(sf_nztm)
+counter_latlong$X <- coords[,1]
+counter_latlong$Y <- coords[,2]
+
+placed <- counter_latlong |> 
+  rename(subdivision = countloc) |> 
+  inner_join(subdivided, by = join_by(subdivision)) 
+```
+
+```{r}
+# make a map
+#| fig-cap: "For counters availabe in 2025 and 2026, 2026 change in March-May pedestrian counts compared to expectations based on 2025"
+m1 <- basemap +
+  geom_point(data=placed, aes(x=X,y=Y), size=0.5, colour="red") +
+  geom_label_repel(data=placed, aes(x=X,y=Y, label=delta_percent_format),
+                   max.overlaps = Inf, size=4, fill="#FFFFFF99",
+                   point.padding = 0.1, box.padding = .5,
+                   min.segment.length = 0) 
+figuresave(x=m1, fname="55_pedestrian_counters")
+m1
+```
+
+
+
+```{r}
+#| fig-cap: "Rolling 7 day total daily cycle counts"
+#trend
+trendata <- rolling7_total(basic_readings)
+
+rollgraph <- rolling_graph(trendata)
+figuresave(x=rollgraph, fname="56_pedestrian_rolling")
+rollgraph
+```
+Pedestrian counts started the year well under 2025 levels, but a week after war broke out rose to consistently exceed 2025.
+
+```{r}
+#| fig-cap: "Weekday percentage change in pedestrian counts compared to 2025 expectations"
+## Weekday changes
+weekDayed <- aggregate_by_weekday(basic_readings)
+wkplt <- weekplot(weekDayed)
+figuresave(x=wkplt, fname="57_pedestrian_weekdays")
+wkplt
+
+```
+There is a very high baseline of growth in walkers above expected rates, but within that Wednesday is the lowest growth, and Monday the second lowest (like other modes of transport). Unlike other modes, weekend growth is very similar to weekday growth, which may say something about the kind of people walking more. 
