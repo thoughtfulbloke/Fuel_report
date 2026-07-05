@@ -74,7 +74,7 @@ While these are managed by both NZTA and the Dunedin City Council, data is publi
 
 https://www.dunedin.govt.nz/community-facilities/cycling/cycle-counter-dashboard
 
-I am using the data contained in this dashboard in a more convenient spreadsheet, courtesy of a request to the Dunedin Regional Council.
+I am using the data contained in this dashboard in a more convenient spreadsheet, courtesy of a request to the Dunedin Ciy Council.
 
 ## The key calculation
 

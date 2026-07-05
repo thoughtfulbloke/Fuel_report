@@ -1,6 +1,6 @@
 # War, fuel, and transport changes
-David Hood, david@thoughtful.net.nz
-2026-07-05
+Version 1.01. Author: David Hood, david@thoughtful.net.nz
+2026-07-06
 
 - [<span class="toc-section-number">1</span>
   Introduction](#introduction)
@@ -146,7 +146,7 @@ is publicly available from the Dunedin City Council at
 https://www.dunedin.govt.nz/community-facilities/cycling/cycle-counter-dashboard
 
 I am using the data contained in this dashboard in a more convenient
-spreadsheet, courtesy of a request to the Dunedin Regional Council.
+spreadsheet, courtesy of a request to the Dunedin Ciy Council.
 
 ## The key calculation
 
