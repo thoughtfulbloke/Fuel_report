@@ -1,0 +1,162 @@
+% =========================
+% 1. FONT SETUP
+% =========================
+\usepackage{fontspec}
+\usepackage{sectsty}
+
+% Main body font
+\setmainfont{Lato}
+
+% Heading font
+\newfontfamily\headingfont{Lexend}
+
+% Apply heading font globally
+\allsectionsfont{\headingfont}
+
+% Balanced heading sizes
+\sectionfont{\headingfont\large\bfseries}
+\subsectionfont{\headingfont\normalsize\bfseries}
+\subsubsectionfont{\headingfont\normalsize\itshape}
+
+
+% =========================
+% 2. TYPOGRAPHY & SPACING
+% =========================
+\usepackage{microtype}
+\usepackage{parskip}
+\usepackage{ragged2e}
+
+\setlength{\parskip}{0.7em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{2em}
+
+\justifying
+
+% Prevent widows/orphans
+\clubpenalty=10000
+\widowpenalty=10000
+\displaywidowpenalty=10000
+
+
+% =========================
+% 3. TITLE & FRONT MATTER
+% =========================
+\usepackage{titling}
+
+\setlength{\droptitle}{-2em}
+
+\pretitle{\begin{flushleft}\headingfont\LARGE\bfseries}
+\posttitle{\par\end{flushleft}\vspace{0.75em}\hrule\vspace{1em}}
+
+\preauthor{\begin{flushleft}\normalsize}
+\postauthor{\par\end{flushleft}\vspace{0.4em}}
+
+\predate{\begin{flushleft}\small}
+\postdate{\par\end{flushleft}}
+
+
+% =========================
+% 4. EXECUTIVE SUMMARY BOX
+% =========================
+\usepackage{tcolorbox}
+
+\newtcolorbox{execsummary}{
+  colback=gray!5,
+  colframe=gray!40,
+  title=\headingfont Executive Summary,
+  fonttitle=\bfseries,
+  boxrule=0.4pt,
+  arc=1.5mm,
+  left=8pt, right=8pt, top=8pt, bottom=8pt
+}
+
+
+% =========================
+% 5. PAGE STYLE
+% =========================
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+
+\fancyhf{}
+\fancyhead[L]{\headingfont\small Transport Report}
+\fancyhead[R]{\small\nouppercase{\leftmark}}
+\fancyfoot[C]{\small\thepage}
+
+\renewcommand{\headrulewidth}{0.3pt}
+
+
+% =========================
+% 6. SECTION SPACING
+% =========================
+\usepackage{titlesec}
+
+\titlespacing*{\section}{0pt}{2.5ex plus 1ex minus .2ex}{1ex}
+\titlespacing*{\subsection}{0pt}{2ex}{0.75ex}
+\titlespacing*{\subsubsection}{0pt}{1.5ex}{0.5ex}
+
+
+% =========================
+% 7. FIGURES & TABLES
+% =========================
+\usepackage{booktabs}
+\usepackage{caption}
+
+\captionsetup{
+  font=small,
+  labelfont=bf,
+  justification=raggedright,
+  singlelinecheck=false
+}
+
+\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
+\setlength{\intextsep}{10pt}
+\setlength{\abovecaptionskip}{6pt}
+\setlength{\belowcaptionskip}{0pt}
+
+
+% =========================
+% 8. LISTS
+% =========================
+\usepackage{enumitem}
+
+\setlist[itemize]{
+  topsep=4pt,
+  itemsep=2pt,
+  leftmargin=*
+}
+
+\setlist[enumerate]{
+  topsep=4pt,
+  itemsep=2pt
+}
+
+
+% =========================
+% 9. TOC STYLE
+% =========================
+\usepackage{tocloft}
+
+% Apply heading font to TOC
+\renewcommand{\cftsecfont}{\headingfont}
+\renewcommand{\cftsecpagefont}{\headingfont}
+% shrink subsection
+\renewcommand{\cftsubsecpagefont}{\small}
+
+% --- Added spacing controls ---
+\setlength{\cftbeforetoctitleskip}{1em}
+\setlength{\cftaftertoctitleskip}{0.5em}
+\setlength{\cftbeforesubsecskip}{0.1em}
+\setlength{\cftsubsecindent}{1.5em}
+% =========================
+% 10. LINKS
+% =========================
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{accent}{HTML}{2C3E50}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=accent,
+  urlcolor=accent
+}

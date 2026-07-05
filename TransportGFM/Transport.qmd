@@ -1,0 +1,109 @@
+---
+title: "War, fuel, and transport changes"
+author: "David Hood, david@thoughtful.net.nz"
+date: today
+abstract: "An analysis of changes in transport use since 28th February 2026 for Ōtepoti/Dunedin. Across all sources, there is strong evidence that there has been a major local shift away from trips in vehicles into other modes."
+
+format:
+  gfm:
+    toc: true
+    toc-depth: 2
+    number-sections: true
+    fig-cap-location: bottom
+    fig-device: ragg_png
+    dpi: 300
+
+# Document layout
+fontsize: 11pt
+geometry: margin=1in
+linestretch: 1.3
+
+# Figures (global defaults)
+fig-width: 5
+fig-height: 3
+fig-align: center
+fig-format: png
+
+# Code execution
+execute:
+  echo: false
+  warning: false
+  message: false
+
+# Optional metadata you can reuse later
+keywords:
+  - transport
+  - fuel
+  - analysis
+---
+
+```{r}
+library(ggplot2)
+source("../support_files/core_functions.R")
+```
+
+
+```{r all_the_data}
+bus_starter <- bus_read_data()
+bus_pre_post <- before_after(bus_starter)
+cycle_starter <- cycle_read_data()
+cycle_pre_post <- before_after(cycle_starter)
+pedestrian_starter <- pedestrian_read_data()
+pedestrian_pre_post <- before_after(pedestrian_starter)
+light_starter <- NZTA_read_data("Light")
+light_pre_post <- before_after(light_starter)
+heavy_starter <- NZTA_read_data("Heavy")
+heavy_pre_post <- before_after(heavy_starter)
+```
+
+Compared to the same time last year, among traffic evidence for Ōtepoti/Dunedin:
+
+- Fuel is up (Regular Petrol +28\%, Diesel +74\%)
+
+- Vehicle traffic counts are down (Light -2.6\%, Heavy -1.1\%)
+
+- Bus patronage is up 11\%
+
+- Cycle traffic counts are up 14.4\%
+
+- Pedestrian traffic counts are up 34.3\%
+
+```{r}
+#| fig-height: 3
+gfdf <- bind_rows(bus_pre_post, cycle_pre_post, heavy_pre_post,
+          light_pre_post, pedestrian_pre_post) |> 
+  filter(Yr == "2026") |> 
+  mutate(x1 = if_else(Mn == "pre-crisis", ymd("2026-01-01"), ymd("2026-03-01")),
+         x2 = if_else(Mn == "pre-crisis", ymd("2026-02-28"), ymd("2026-05-31")))
+
+gfit <- allgraph(gfdf)
+figuresave(x=gfit, fname="00_all")
+gfit
+```
+
+\pagebreak
+{{< include ../chapters/01_introduction.qmd >}}
+
+\pagebreak
+{{< include ../chapters/02_fuel_prices.qmd >}}
+
+\pagebreak
+{{< include ../chapters/03_census.qmd >}}
+
+\pagebreak
+{{< include ../chapters/04_light.qmd >}}
+
+\pagebreak
+{{< include ../chapters/05_heavy.qmd >}}
+
+\pagebreak
+{{< include ../chapters/06_bus.qmd >}}
+
+\pagebreak
+{{< include ../chapters/07_cycle.qmd >}}
+
+\pagebreak
+{{< include ../chapters/08_pedestrian.qmd >}}
+
+\pagebreak
+{{< include ../chapters/09_mode_shift.qmd >}}
